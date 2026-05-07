@@ -29,7 +29,7 @@ jobs:
           fi
 
       - name: Build package
-        uses: heyhusen/archlinux-package-action@v3
+        uses: heyhusen/archlinux-package-action@v3.0.0
         with:
           pkgver: ${{ steps.version.outputs.ver }}
           flags: '-cfs --noconfirm'
