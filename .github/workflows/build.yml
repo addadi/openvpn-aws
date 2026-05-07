@@ -1,0 +1,81 @@
+name: Build openvpn-aws
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'OpenVPN version (e.g. 2.6.12)'
+        required: false
+        default: ''
+  schedule:
+    - cron: '0 6 * * 1'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ -n "${{ inputs.version }}" ]]; then
+            echo "ver=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ver=$(grep '^pkgver=' PKGBUILD | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build package
+        uses: heyhusen/archlinux-package-action@v3
+        with:
+          pkgver: ${{ steps.version.outputs.ver }}
+          flags: '-cfs --noconfirm'
+          namcap: false
+          updpkgsums: false
+          srcinfo: true
+          pgpkeys: 'F554A3687412CFFEBDEFE0A312F5F7B42F2B01E7,B62E6A2B4E56570B7BDC6BE01D829EFECA562812'
+
+      - name: Extract binary
+        run: |
+          mkdir -p output
+          cp *.pkg.tar.zst output/ 2>/dev/null || true
+          if command -v bsdtar >/dev/null 2>&1; then
+            bsdtar -xf *.pkg.tar.zst usr/bin/openvpn-aws 2>/dev/null
+            mv usr/bin/openvpn-aws output/openvpn-aws 2>/dev/null || true
+          fi
+          cd output
+          sha256sum * > SHA256SUMS 2>/dev/null || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openvpn-aws-${{ steps.version.outputs.ver }}
+          path: output/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Determine version
+        id: version
+        run: |
+          echo "ver=$(grep '^pkgver=' PKGBUILD | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.ver }}
+          name: openvpn-aws ${{ steps.version.outputs.ver }}
+          files: artifacts/openvpn-aws-${{ steps.version.outputs.ver }}/*
+          generate_release_notes: true
