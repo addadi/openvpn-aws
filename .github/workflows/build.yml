@@ -26,6 +26,12 @@ jobs:
           pacman -Syu --noconfirm
           pacman -S --noconfirm --needed git systemd python-docutils lzo lz4 libcap-ng libnl openssl pkcs11-helper
 
+      - name: Create build user
+        run: |
+          useradd -m -G wheel builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+          chown -R builder:builder .
+
       - name: Determine version
         id: version
         run: |
@@ -39,11 +45,11 @@ jobs:
 
       - name: Update checksums
         run: |
-          updpkgsums || true
+          sudo -u builder updpkgsums || true
 
       - name: Build package
         run: |
-          makepkg -sf --noconfirm --skippgpcheck
+          sudo -u builder makepkg -sf --noconfirm --skippgpcheck
 
       - name: Extract binary
         run: |
