@@ -9,45 +9,55 @@ on:
         description: 'OpenVPN version (e.g. 2.6.12)'
         required: false
         default: ''
-  schedule:
-    - cron: '0 6 * * 1'
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+      options: --privileged
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Init pacman
+        run: |
+          pacman-key --init
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm --needed git systemd python-docutils lzo lz4 libcap-ng libnl openssl pkcs11-helper
 
       - name: Determine version
         id: version
         run: |
           if [[ -n "${{ inputs.version }}" ]]; then
-            echo "ver=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            VER="${{ inputs.version }}"
+            sed -i "s/^pkgver=.*/pkgver=$VER/" PKGBUILD
           else
-            echo "ver=$(grep '^pkgver=' PKGBUILD | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+            VER=$(grep '^pkgver=' PKGBUILD | cut -d= -f2)
           fi
+          echo "ver=$VER" >> "$GITHUB_OUTPUT"
+
+      - name: Update checksums
+        run: |
+          updpkgsums || true
 
       - name: Build package
-        uses: heyhusen/archlinux-package-action@v3.0.0
-        with:
-          pkgver: ${{ steps.version.outputs.ver }}
-          flags: '-cfs --noconfirm'
-          namcap: false
-          updpkgsums: false
-          srcinfo: true
-          pgpkeys: 'F554A3687412CFFEBDEFE0A312F5F7B42F2B01E7,B62E6A2B4E56570B7BDC6BE01D829EFECA562812'
+        run: |
+          makepkg -sf --noconfirm --skippgpcheck
 
       - name: Extract binary
         run: |
           mkdir -p output
           cp *.pkg.tar.zst output/ 2>/dev/null || true
-          if command -v bsdtar >/dev/null 2>&1; then
-            bsdtar -xf *.pkg.tar.zst usr/bin/openvpn-aws 2>/dev/null
-            mv usr/bin/openvpn-aws output/openvpn-aws 2>/dev/null || true
+          bsdtar -xf *.pkg.tar.zst usr/bin/openvpn-aws 2>/dev/null || \
+            bsdtar -xf *.pkg.tar.zst usr/local/bin/openvpn-aws 2>/dev/null || true
+          if [[ -f usr/bin/openvpn-aws ]]; then
+            mv usr/bin/openvpn-aws output/openvpn-aws
           fi
           cd output
           sha256sum * > SHA256SUMS 2>/dev/null || true
+          echo "Files:"
+          ls -la
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -62,20 +72,24 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Determine version
         id: version
         run: |
           echo "ver=$(grep '^pkgver=' PKGBUILD | cut -d= -f2)" >> "$GITHUB_OUTPUT"
 
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: openvpn-aws-${{ steps.version.outputs.ver }}
+          path: artifacts
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.ver }}
           name: openvpn-aws ${{ steps.version.outputs.ver }}
-          files: artifacts/openvpn-aws-${{ steps.version.outputs.ver }}/*
+          files: artifacts/*
           generate_release_notes: true
