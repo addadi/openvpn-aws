@@ -17,9 +17,9 @@ jobs:
       matrix:
         include:
           - openvpn_version: "2.6.12"
-            channel: stable
+            channel: "2.6.x"
           - openvpn_version: "2.7.4"
-            channel: preview
+            channel: "2.7.x"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -105,9 +105,9 @@ jobs:
       matrix:
         include:
           - openvpn_version: "2.6.12"
-            channel: stable
+            channel: "2.6.x"
           - openvpn_version: "2.7.4"
-            channel: preview
+            channel: "2.7.x"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
