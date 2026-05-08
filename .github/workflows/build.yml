@@ -1,4 +1,4 @@
-name: Build openvpn-aws
+name: Build and Release
 
 on:
   push:
@@ -8,20 +8,13 @@ on:
       version:
         description: 'OpenVPN version (e.g. 2.6.12)'
         required: false
-        default: '2.6.12'
+        default: ''
   schedule:
     - cron: '0 6 * * 1'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - arch: x86_64
-            cc: gcc
-          - arch: aarch64
-            cc: aarch64-linux-gnu-gcc
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,54 +25,39 @@ jobs:
           if [[ -n "${{ inputs.version }}" ]]; then
             echo "ver=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
           else
-            echo "ver=$(grep '^OPENVPN_VERSION' Makefile | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+            echo "ver=$(grep '^OPENVPN_VERSION' Makefile | cut -d= -f2 | tr -d ' ')" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Install build deps
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential autoconf automake libtool pkg-config \
-            libssl-dev liblzo2-dev liblz4-dev libcap-ng-dev libnl-3-dev libnl-genl-3-dev \
-            libpkcs11-helper1-dev libsystemd-dev
-          if [[ "${{ matrix.arch }}" == "aarch64" ]]; then
-            sudo apt-get install -y gcc-aarch64-linux-gnu
-          fi
+            autoconf automake libtool pkg-config \
+            libssl-dev liblzo2-dev liblz4-dev libcap-ng-dev \
+            libnl-3-dev libnl-genl-3-dev libpkcs11-helper1-dev libsystemd-dev
 
-      - name: Download OpenVPN source
+      - name: Download and patch OpenVPN
         run: |
-          VER=${{ steps.version.outputs.ver }}
-          curl -L "https://github.com/OpenVPN/openvpn/archive/refs/tags/v${VER}.tar.gz" | tar xz
-          mv "openvpn-${VER}" openvpn-source
-
-      - name: Apply patches
-        run: |
-          cd openvpn-source
-          patch -p1 < "$GITHUB_WORKSPACE/0001-unprivileged.patch"
-          patch -p1 < "$GITHUB_WORKSPACE/aws.patch"
+          make fetch patch OPENVPN_VERSION=${{ steps.version.outputs.ver }}
 
       - name: Build
         run: |
           cd openvpn-source
           autoreconf -fvi
-          ./configure \
-            CC=${{ matrix.cc }} \
-            --prefix=/usr \
-            --disable-dependency-tracking
+          ./configure --prefix=/usr --sbindir=/usr/bin
           make -j$(nproc)
+          strip src/openvpn/openvpn
 
       - name: Package
         run: |
           mkdir -p output
-          strip openvpn-source/src/openvpn/openvpn
-          cp openvpn-source/src/openvpn/openvpn "output/openvpn-aws-${{ matrix.arch }}"
-          cd output
-          sha256sum * > SHA256SUMS
+          cp openvpn-source/src/openvpn/openvpn "output/openvpn-aws-${{ steps.version.outputs.ver }}-x86_64"
+          cd output && sha256sum * > SHA256SUMS
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: openvpn-aws-${{ matrix.arch }}-${{ steps.version.outputs.ver }}
+          name: openvpn-aws-${{ steps.version.outputs.ver }}
           path: output/
 
   release:
@@ -98,14 +76,14 @@ jobs:
           if [[ -n "${{ inputs.version }}" ]]; then
             echo "ver=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
           else
-            echo "ver=$(grep '^OPENVPN_VERSION' Makefile | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+            echo "ver=$(grep '^OPENVPN_VERSION' Makefile | cut -d= -f2 | tr -d ' ')" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Download all artifacts
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
+          name: openvpn-aws-${{ steps.version.outputs.ver }}
           path: artifacts
-          merge-multiple: true
 
       - name: Create release
         uses: softprops/action-gh-release@v2
