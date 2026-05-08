@@ -34,7 +34,8 @@ jobs:
           sudo apt-get install -y \
             autoconf automake libtool pkg-config \
             libssl-dev liblzo2-dev liblz4-dev libcap-ng-dev \
-            libnl-3-dev libnl-genl-3-dev libpkcs11-helper1-dev libsystemd-dev
+            libnl-3-dev libnl-genl-3-dev libpkcs11-helper1-dev libsystemd-dev \
+            libpam0g-dev
 
       - name: Download and patch OpenVPN
         run: |
