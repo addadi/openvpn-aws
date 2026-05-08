@@ -62,9 +62,9 @@ jobs:
         run: |
           cd openvpn-source
           PATCHDIR="${{ steps.patches.outputs.dir }}"
-          for p in "$PATCHDIR"/*.patch; do
-            echo "Applying $(basename $p)..."
-            patch -p1 < "$GITHUB_WORKSPACE/$p"
+          for p in "$GITHUB_WORKSPACE/$PATCHDIR"/*.patch; do
+            echo "Applying $(basename "$p")..."
+            patch -p1 < "$p"
           done
 
       - name: Build
