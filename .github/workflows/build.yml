@@ -9,12 +9,17 @@ on:
         description: 'OpenVPN version (e.g. 2.7.4)'
         required: false
         default: ''
-  schedule:
-    - cron: '0 6 * * 1'
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - openvpn_version: "2.6.12"
+            channel: stable
+          - openvpn_version: "2.7.4"
+            channel: preview
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,8 +29,10 @@ jobs:
         run: |
           if [[ -n "${{ inputs.version }}" ]]; then
             echo "ver=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "channel=manual" >> "$GITHUB_OUTPUT"
           else
-            echo "ver=$(grep '^OPENVPN_VERSION' Makefile | cut -d= -f2 | tr -d ' ')" >> "$GITHUB_OUTPUT"
+            echo "ver=${{ matrix.openvpn_version }}" >> "$GITHUB_OUTPUT"
+            echo "channel=${{ matrix.channel }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Select patch directory
@@ -77,8 +84,9 @@ jobs:
 
       - name: Package
         run: |
+          VER=${{ steps.version.outputs.ver }}
           mkdir -p output
-          cp openvpn-source/src/openvpn/openvpn "output/openvpn-aws-${{ steps.version.outputs.ver }}-x86_64"
+          cp openvpn-source/src/openvpn/openvpn "output/openvpn-aws-${VER}-x86_64"
           cd output && sha256sum * > SHA256SUMS
 
       - name: Upload artifacts
@@ -93,6 +101,13 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     permissions:
       contents: write
+    strategy:
+      matrix:
+        include:
+          - openvpn_version: "2.6.12"
+            channel: stable
+          - openvpn_version: "2.7.4"
+            channel: preview
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -102,8 +117,10 @@ jobs:
         run: |
           if [[ -n "${{ inputs.version }}" ]]; then
             echo "ver=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "channel=manual" >> "$GITHUB_OUTPUT"
           else
-            echo "ver=$(grep '^OPENVPN_VERSION' Makefile | cut -d= -f2 | tr -d ' ')" >> "$GITHUB_OUTPUT"
+            echo "ver=${{ matrix.openvpn_version }}" >> "$GITHUB_OUTPUT"
+            echo "channel=${{ matrix.channel }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Download artifacts
@@ -116,6 +133,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.ver }}
-          name: openvpn-aws ${{ steps.version.outputs.ver }}
+          name: openvpn-aws ${{ steps.version.outputs.ver }} (${{ steps.version.outputs.channel }})
           files: artifacts/*
           generate_release_notes: true
