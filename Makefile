@@ -1,4 +1,4 @@
-OPENVPN_VERSION ?= 2.6.12
+OPENVPN_VERSION ?= 2.6.20
 SOURCE_DIR = openvpn-source
 BINARY = openvpn-aws
 

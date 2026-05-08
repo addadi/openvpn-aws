@@ -1,6 +1,6 @@
-diff -ruN openvpn-2.6.12/distro/systemd/openvpn-client@.service.in openvpn-patch/distro/systemd/openvpn-client@.service.in
---- openvpn-2.6.12/distro/systemd/openvpn-client@.service.in	2024-07-17 23:14:46.000000000 +0300
-+++ openvpn-patch/distro/systemd/openvpn-client@.service.in	2026-05-08 09:30:40.831923914 +0300
+diff -ruN openvpn-2.6.20/distro/systemd/openvpn-client@.service.in ov2620-unpriv/distro/systemd/openvpn-client@.service.in
+--- openvpn-2.6.20/distro/systemd/openvpn-client@.service.in	2026-04-22 10:17:36.000000000 +0300
++++ ov2620-unpriv/distro/systemd/openvpn-client@.service.in	2026-05-08 21:04:30.709544475 +0300
 @@ -11,6 +11,9 @@
  PrivateTmp=true
  WorkingDirectory=/etc/openvpn/client
@@ -11,9 +11,9 @@ diff -ruN openvpn-2.6.12/distro/systemd/openvpn-client@.service.in openvpn-patch
  CapabilityBoundingSet=CAP_IPC_LOCK CAP_NET_ADMIN CAP_NET_RAW CAP_SETGID CAP_SETUID CAP_SETPCAP CAP_SYS_CHROOT CAP_DAC_OVERRIDE
  LimitNPROC=10
  DeviceAllow=/dev/null rw
-diff -ruN openvpn-2.6.12/distro/systemd/openvpn-server@.service.in openvpn-patch/distro/systemd/openvpn-server@.service.in
---- openvpn-2.6.12/distro/systemd/openvpn-server@.service.in	2024-07-17 23:14:46.000000000 +0300
-+++ openvpn-patch/distro/systemd/openvpn-server@.service.in	2026-05-08 09:30:40.833307977 +0300
+diff -ruN openvpn-2.6.20/distro/systemd/openvpn-server@.service.in ov2620-unpriv/distro/systemd/openvpn-server@.service.in
+--- openvpn-2.6.20/distro/systemd/openvpn-server@.service.in	2026-04-22 10:17:36.000000000 +0300
++++ ov2620-unpriv/distro/systemd/openvpn-server@.service.in	2026-05-08 21:04:30.710805174 +0300
 @@ -11,6 +11,9 @@
  PrivateTmp=true
  WorkingDirectory=/etc/openvpn/server
@@ -24,14 +24,13 @@ diff -ruN openvpn-2.6.12/distro/systemd/openvpn-server@.service.in openvpn-patch
  CapabilityBoundingSet=CAP_IPC_LOCK CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_SETGID CAP_SETUID CAP_SETPCAP CAP_SYS_CHROOT CAP_DAC_OVERRIDE CAP_AUDIT_WRITE
  LimitNPROC=10
  DeviceAllow=/dev/null rw
-diff -ruN openvpn-2.6.12/src/openvpn/console_systemd.c openvpn-patch/src/openvpn/console_systemd.c
---- openvpn-2.6.12/src/openvpn/console_systemd.c	2024-07-17 23:14:46.000000000 +0300
-+++ openvpn-patch/src/openvpn/console_systemd.c	2026-05-08 09:30:40.830405468 +0300
-@@ -71,6 +71,8 @@
-     }
+diff -ruN openvpn-2.6.20/src/openvpn/console_systemd.c ov2620-unpriv/src/openvpn/console_systemd.c
+--- openvpn-2.6.20/src/openvpn/console_systemd.c	2026-04-22 10:17:36.000000000 +0300
++++ ov2620-unpriv/src/openvpn/console_systemd.c	2026-05-08 21:04:30.708153076 +0300
+@@ -72,6 +72,7 @@
  #endif
      argv_printf_cat(&argv, "--icon network-vpn");
-+    argv_printf_cat(&argv, "--timeout=0");
+     argv_printf_cat(&argv, "--timeout=0");
 +    argv_printf_cat(&argv, "--system");
      argv_printf_cat(&argv, "%s", prompt);
  

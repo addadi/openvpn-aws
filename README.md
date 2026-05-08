@@ -17,7 +17,7 @@ encoding from `u16` to `u32`, enabling the full SAML assertion flow.
 Pre-built binaries from [GitHub Releases](https://github.com/addadi/openvpn-aws/releases).
 
 Two release channels tracking upstream [OpenVPN](https://github.com/OpenVPN/openvpn) releases:
-- **2.6.x** — Based on [OpenVPN 2.6.x](https://github.com/OpenVPN/openvpn/releases/tag/v2.6.12) (well-tested, production use)
+- **2.6.x** — Based on [OpenVPN 2.6.x](https://github.com/OpenVPN/openvpn/releases/tag/v2.6.20) (well-tested, production use)
 - **2.7.x** — Based on [OpenVPN 2.7.x](https://github.com/OpenVPN/openvpn/releases/tag/v2.7.4) (newer upstream, needs testing)
 
 ## Patches
@@ -58,7 +58,7 @@ Organized per upstream release series:
 ### Local
 
 ```bash
-make build                           # Default: OpenVPN 2.6.12
+make build                           # Default: OpenVPN 2.6.20
 make build OPENVPN_VERSION=2.7.4     # Specific version
 ```
 
@@ -70,7 +70,7 @@ Builds both channels on push to master:
 
 | Channel | Version | Release Tag |
 |---------|---------|-------------|
-| 2.6.x | 2.6.12 | `v2.6.12` |
+| 2.6.x | 2.6.20 | `v2.6.20` |
 | 2.7.x | 2.7.4 | `v2.7.4` |
 
 Manual dispatch with version input:

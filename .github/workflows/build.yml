@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - openvpn_version: "2.6.12"
+          - openvpn_version: "2.6.20"
             channel: "2.6.x"
           - openvpn_version: "2.7.4"
             channel: "2.7.x"
@@ -104,7 +104,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - openvpn_version: "2.6.12"
+          - openvpn_version: "2.6.20"
             channel: "2.6.x"
           - openvpn_version: "2.7.4"
             channel: "2.7.x"
