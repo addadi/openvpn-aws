@@ -13,8 +13,19 @@ fetch:
 
 patch: fetch
 	@echo "Applying patches..."
-	cd $(SOURCE_DIR) && patch -p1 < "../0001-unprivileged.patch"
-	cd $(SOURCE_DIR) && patch -p1 < "../aws.patch"
+	@MAJOR=$$(echo $(OPENVPN_VERSION) | cut -d. -f1); \
+	MINOR=$$(echo $(OPENVPN_VERSION) | cut -d. -f2); \
+	PATCHDIR="patches/$${MAJOR}.$${MINOR}.x"; \
+	if [ ! -d "$$PATCHDIR" ]; then \
+		echo "ERROR: No patches for $$MAJOR.$$MINOR.x"; \
+		echo "Available: $$(ls -d patches/*/)"; \
+		exit 1; \
+	fi; \
+	cd $(SOURCE_DIR); \
+	for p in ../$$PATCHDIR/*.patch; do \
+		echo "  Applying $$(basename $$p)..."; \
+		patch -p1 < "$$p"; \
+	done
 
 build: patch
 	@echo "Building..."

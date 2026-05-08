@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'OpenVPN version (e.g. 2.6.12)'
+        description: 'OpenVPN version (e.g. 2.7.4)'
         required: false
         default: ''
   schedule:
@@ -28,6 +28,21 @@ jobs:
             echo "ver=$(grep '^OPENVPN_VERSION' Makefile | cut -d= -f2 | tr -d ' ')" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Select patch directory
+        id: patches
+        run: |
+          VER=${{ steps.version.outputs.ver }}
+          MAJOR=$(echo "$VER" | cut -d. -f1)
+          MINOR=$(echo "$VER" | cut -d. -f2)
+          DIR="patches/${MAJOR}.${MINOR}.x"
+          if [[ ! -d "$DIR" ]]; then
+            echo "ERROR: No patches for OpenVPN ${MAJOR}.${MINOR}.x (looked in $DIR)"
+            echo "Available: $(ls -d patches/*/)"
+            exit 1
+          fi
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+          echo "Using patches from $DIR"
+
       - name: Install build deps
         run: |
           sudo apt-get update
@@ -37,9 +52,20 @@ jobs:
             libnl-3-dev libnl-genl-3-dev libpkcs11-helper1-dev libsystemd-dev \
             libpam0g-dev
 
-      - name: Download and patch OpenVPN
+      - name: Download OpenVPN source
         run: |
-          make fetch patch OPENVPN_VERSION=${{ steps.version.outputs.ver }}
+          VER=${{ steps.version.outputs.ver }}
+          curl -L "https://github.com/OpenVPN/openvpn/archive/refs/tags/v${VER}.tar.gz" | tar xz
+          mv "openvpn-${VER}" openvpn-source
+
+      - name: Apply patches
+        run: |
+          cd openvpn-source
+          PATCHDIR="${{ steps.patches.outputs.dir }}"
+          for p in "$PATCHDIR"/*.patch; do
+            echo "Applying $(basename $p)..."
+            patch -p1 < "$GITHUB_WORKSPACE/$p"
+          done
 
       - name: Build
         run: |
