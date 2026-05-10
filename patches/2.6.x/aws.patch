@@ -103,25 +103,3 @@ diff -ruN openvpn-2.6.20/src/openvpn/options.h ov2620-aws/src/openvpn/options.h
  
  extern const char title_string[];
  
-diff -ruN openvpn-2.6.20/src/openvpn/ssl.c ov2620-aws/src/openvpn/ssl.c
---- openvpn-2.6.20/src/openvpn/ssl.c	2026-04-22 10:17:36.000000000 +0300
-+++ ov2620-aws/src/openvpn/ssl.c	2026-05-08 21:04:46.713350508 +0300
-@@ -1951,7 +1951,7 @@
- static bool
- write_empty_string(struct buffer *buf)
- {
--    if (!buf_write_u16(buf, 0))
-+    if (!buf_write_u32(buf, 0))
-     {
-         return false;
-     }
-@@ -2805,6 +2805,9 @@
-         /* More data may be available, wake up again asap to check. */
-         *wakeup = 0;
-     }
-+    // Write key length in the first 4 octets of the buffer.
-+    uint32_t length = BLEN(buf);
-+    memcpy(buf->data, &length, sizeof(length));
-     return true;
- }
- 
