@@ -1,4 +1,4 @@
-OPENVPN_VERSION = 2.6.12
+OPENVPN_VERSION = 2.6.20
 SOURCE_DIR = openvpn-source
 BINARY = openvpn-aws
 
@@ -15,12 +15,13 @@ patch: fetch
 	@echo "Applying patches..."
 	cd $(SOURCE_DIR) && patch -p1 < "../0001-unprivileged.patch"
 	cd $(SOURCE_DIR) && patch -p1 < "../aws.patch"
+	cd $(SOURCE_DIR) && patch -p1 < "../patches/push-reply-prefix-fix.patch"
 
 build: patch
 	@echo "Building..."
 	cd $(SOURCE_DIR) && autoreconf -fvi
 	cd $(SOURCE_DIR) && ./configure --prefix=/usr --sbindir=/usr/bin
-	$(MAKE) -C $(SOURCE_DIR) -j$$(nproc)
+	$(MAKE) -C $(SOURCE_DIR) -j$(nproc)
 	cp $(SOURCE_DIR)/src/openvpn/openvpn $(BINARY)
 	strip $(BINARY)
 	@echo "Built: $(BINARY)"

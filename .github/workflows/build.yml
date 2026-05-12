@@ -6,14 +6,49 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'OpenVPN version (e.g. 2.6.12)'
+        description: 'OpenVPN version (e.g. 2.6.20)'
         required: false
-        default: '2.6.12'
   schedule:
     - cron: '0 6 * * 1'
 
 jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.detect.outputs.version }}
+      should_build: ${{ steps.detect.outputs.should_build }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect upstream version
+        id: detect
+        run: |
+          if [[ -n "${{ inputs.version }}" ]]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          UPSTREAM=$(curl -sf https://api.github.com/repos/OpenVPN/openvpn/releases/latest | jq -r '.tag_name | ltrimstr("v")')
+          if [[ -z "$UPSTREAM" ]]; then
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          LAST_BUILT=$(cat LAST_BUILT_VERSION 2>/dev/null || echo "0")
+          echo "upstream=$UPSTREAM last_built=$LAST_BUILT"
+
+          if [[ "$UPSTREAM" != "$LAST_BUILT" ]]; then
+            echo "version=$UPSTREAM" >> "$GITHUB_OUTPUT"
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: check-upstream
+    if: needs.check-upstream.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -26,13 +61,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Determine version
+      - name: Determine version and patch file
         id: version
         run: |
-          if [[ -n "${{ inputs.version }}" ]]; then
-            echo "ver=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          VER="${{ needs.check-upstream.outputs.version }}"
+          echo "ver=$VER" >> "$GITHUB_OUTPUT"
+          MAJOR=$(echo "$VER" | cut -d. -f1)
+          MINOR=$(echo "$VER" | cut -d. -f2)
+          if [[ "$MAJOR" -ge 2 && "$MINOR" -ge 7 ]]; then
+            echo "prefix_patch=patches/push-reply-prefix-fix-2.7.x.patch" >> "$GITHUB_OUTPUT"
           else
-            echo "ver=$(grep '^OPENVPN_VERSION' Makefile | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+            echo "prefix_patch=patches/push-reply-prefix-fix.patch" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Install build deps
@@ -55,8 +94,12 @@ jobs:
       - name: Apply patches
         run: |
           cd openvpn-source
-          patch -p1 < "$GITHUB_WORKSPACE/0001-unprivileged.patch"
-          patch -p1 < "$GITHUB_WORKSPACE/aws.patch"
+          patch -p1 < "$GITHUB_WORKSPACE/0001-unprivileged.patch" || exit 1
+          patch -p1 < "$GITHUB_WORKSPACE/aws.patch" || exit 1
+          patch -p1 < "$GITHUB_WORKSPACE/${{ steps.version.outputs.prefix_patch }}" || {
+            echo "::error::Prefix-fix patch failed on OpenVPN ${{ steps.version.outputs.ver }}"
+            exit 1
+          }
 
       - name: Build
         run: |
@@ -67,6 +110,29 @@ jobs:
             --prefix=/usr \
             --disable-dependency-tracking
           make -j$(nproc)
+
+      - name: Verify binary
+        run: |
+          BINARY=openvpn-source/src/openvpn/openvpn
+          SIZE=$(stat -c%s "$BINARY")
+          echo "Binary size: ${SIZE} bytes"
+          if [[ "$SIZE" -lt 500000 || "$SIZE" -gt 2000000 ]]; then
+            echo "::error::Binary size ${SIZE} outside expected range (500KB-2MB)"
+            exit 1
+          fi
+
+      - name: Smoke test
+        run: |
+          BINARY=openvpn-source/src/openvpn/openvpn
+          "$BINARY" --version 2>&1 | head -2
+          strings "$BINARY" | grep -q '_REPLY' || {
+            echo "::error::PUSH_REPLY prefix-fix not applied: '_REPLY' string not found in binary"
+            exit 1
+          }
+          strings "$BINARY" | grep -q '_FAILED' || {
+            echo "::error::AUTH_FAILED prefix-fix not applied: '_FAILED' string not found in binary"
+            exit 1
+          }
 
       - name: Package
         run: |
@@ -83,9 +149,9 @@ jobs:
           path: output/
 
   release:
-    needs: build
+    needs: [check-upstream, build]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: always() && needs.build.result == 'success'
     permissions:
       contents: write
     steps:
@@ -95,11 +161,7 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          if [[ -n "${{ inputs.version }}" ]]; then
-            echo "ver=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "ver=$(grep '^OPENVPN_VERSION' Makefile | cut -d= -f2)" >> "$GITHUB_OUTPUT"
-          fi
+          echo "ver=${{ needs.check-upstream.outputs.version }}" >> "$GITHUB_OUTPUT"
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -112,5 +174,42 @@ jobs:
         with:
           tag_name: v${{ steps.version.outputs.ver }}
           name: openvpn-aws ${{ steps.version.outputs.ver }}
+          body: |
+            Patched OpenVPN ${{ steps.version.outputs.ver }} for AWS Client VPN.
+
+            **Patches applied:**
+            - `0001-unprivileged.patch` — unprivileged mode
+            - `aws.patch` — large SAML token support (256KB buffer)
+            - `push-reply-prefix-fix.patch` — AWS control channel message prefix handling
+
+            **Verification:** Binary contains `_REPLY` and `_FAILED` handling for AWS VPN server's 3-byte prefixed control messages.
           files: artifacts/*
-          generate_release_notes: true
+
+      - name: Update LAST_BUILT_VERSION
+        run: |
+          echo "${{ steps.version.outputs.ver }}" > LAST_BUILT_VERSION
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add LAST_BUILT_VERSION
+          git diff --cached --quiet || git commit -m "UPDATE: LAST_BUILT_VERSION -> ${{ steps.version.outputs.ver }}"
+          git push
+
+  patch-conflict:
+    needs: [check-upstream, build]
+    runs-on: ubuntu-latest
+    if: always() && needs.build.result == 'failure' && needs.check-upstream.outputs.should_build == 'true'
+    permissions:
+      issues: write
+    steps:
+      - name: Create patch conflict issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ver = '${{ needs.check-upstream.outputs.version }}';
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `ACTION REQUIRED: Patch conflict on OpenVPN ${ver}`,
+              body: `The automated build failed for OpenVPN ${ver}. This likely means the \`push-reply-prefix-fix.patch\` or \`aws.patch\` does not apply cleanly.\n\n**Steps to fix:**\n1. Download OpenVPN ${ver} source\n2. Rebase the patches manually\n3. Push updated patches to master\n4. Re-run the workflow\n\n[Failed run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+              labels: ['patch-conflict', 'automated']
+            });

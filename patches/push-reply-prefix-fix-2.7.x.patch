@@ -1,0 +1,44 @@
+--- a/src/openvpn/forward.c
++++ b/src/openvpn/forward.c
+@@ -233,11 +233,13 @@
+ static void
+ parse_incoming_control_channel_command(struct context *c, struct buffer *buf)
+ {
+-    if (buf_string_match_head_str(buf, "AUTH_FAILED"))
++    if (buf_string_match_head_str(buf, "AUTH_FAILED")
++        || buf_string_match_head_str(buf, "_FAILED"))
+     {
+         receive_auth_failed(c, buf);
+     }
+-    else if (buf_string_match_head_str(buf, "PUSH_"))
++    else if (buf_string_match_head_str(buf, "PUSH_")
++             || buf_string_match_head_str(buf, "_REPLY"))
+     {
+         incoming_push_message(c, buf);
+     }
+
+--- a/src/openvpn/push.c
++++ b/src/openvpn/push.c
+@@ -59,7 +59,8 @@
+ 
+     /* If the AUTH_FAIL message ends with a , it is an extended message that
+      * contains further flags */
+-    bool authfail_extended = buf_string_compare_advance(&buf, "AUTH_FAILED,");
++    bool authfail_extended = buf_string_compare_advance(&buf, "AUTH_FAILED,")
++                             || buf_string_compare_advance(&buf, "_FAILED,");
+ 
+     const char *reason = NULL;
+     if (authfail_extended && BLEN(&buf))
+@@ -1119,6 +1119,11 @@
+         return process_incoming_push_request(c);
+     }
+-    else if (honor_received_options && buf_string_compare_advance(&buf, push_reply_cmd))
++    else if (honor_received_options && buf_string_compare_advance(&buf, "_REPLY"))
++    {
++        return process_incoming_push_reply(c, permission_mask,
++                                           option_types_found, &buf);
++    }
++    else if (honor_received_options && buf_string_compare_advance(&buf, push_reply_cmd))
+     {
+         return process_incoming_push_reply(c, permission_mask,
+                                            option_types_found, &buf);
