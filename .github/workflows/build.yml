@@ -108,13 +108,14 @@ jobs:
           ./configure CC=${{ matrix.cc }} $CONFIGURE_ARGS
           make -j$(nproc)
 
-      - name: Verify binary
+      - name: Strip and verify binary
         run: |
           BINARY=openvpn-source/src/openvpn/openvpn
+          strip "$BINARY"
           SIZE=$(stat -c%s "$BINARY")
           echo "Binary size: ${SIZE} bytes"
-          if [[ "$SIZE" -lt 500000 || "$SIZE" -gt 2000000 ]]; then
-            echo "::error::Binary size ${SIZE} outside expected range (500KB-2MB)"
+          if [[ "$SIZE" -lt 300000 || "$SIZE" -gt 2000000 ]]; then
+            echo "::error::Binary size ${SIZE} outside expected range (300KB-2MB)"
             exit 1
           fi
 
@@ -134,7 +135,6 @@ jobs:
       - name: Package
         run: |
           mkdir -p output
-          strip openvpn-source/src/openvpn/openvpn
           cp openvpn-source/src/openvpn/openvpn "output/openvpn-aws-${{ matrix.arch }}"
           cd output
           sha256sum * > SHA256SUMS
