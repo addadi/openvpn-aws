@@ -140,7 +140,7 @@ jobs:
       - name: Package
         run: |
           mkdir -p output
-          cp openvpn-source/src/openvpn/openvpn "output/openvpn-aws-${{ matrix.arch }}"
+          cp openvpn-source/src/openvpn/openvpn "output/openvpn-aws-${{ steps.version.outputs.ver }}-x86_64"
           cd output
           sha256sum * > SHA256SUMS
 
