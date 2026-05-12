@@ -63,8 +63,10 @@ jobs:
           MINOR=$(echo "$VER" | cut -d. -f2)
           if [[ "$MAJOR" -ge 2 && "$MINOR" -ge 7 ]]; then
             echo "prefix_patch=patches/push-reply-prefix-fix-2.7.x.patch" >> "$GITHUB_OUTPUT"
+            echo "aws_patch=aws-2.7.x.patch" >> "$GITHUB_OUTPUT"
           else
             echo "prefix_patch=patches/push-reply-prefix-fix.patch" >> "$GITHUB_OUTPUT"
+            echo "aws_patch=aws.patch" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Install build deps
@@ -88,8 +90,8 @@ jobs:
         run: |
           cd openvpn-source
           patch -p1 < "$GITHUB_WORKSPACE/0001-unprivileged.patch" || echo "::warning::Unprivileged patch failed (optional)"
-          patch -p1 < "$GITHUB_WORKSPACE/aws.patch" || {
-            echo "::error::aws.patch failed on OpenVPN ${{ steps.version.outputs.ver }} — buffer size + TLS encoding patches need rebase"
+          patch -p1 < "$GITHUB_WORKSPACE/${{ steps.version.outputs.aws_patch }}" || {
+            echo "::error::aws patch failed on OpenVPN ${{ steps.version.outputs.ver }} — buffer size + TLS encoding patches need rebase"
             exit 1
           }
           patch -p1 < "$GITHUB_WORKSPACE/${{ steps.version.outputs.prefix_patch }}" || {
@@ -181,8 +183,8 @@ jobs:
 
             **Patches applied:**
             - `0001-unprivileged.patch` — unprivileged mode
-            - `aws.patch` — large SAML token support (256KB buffer)
-            - `push-reply-prefix-fix.patch` — AWS control channel message prefix handling
+            - `aws.patch` or `aws-2.7.x.patch` — large SAML token support (256KB buffer)
+            - `push-reply-prefix-fix.patch` or `push-reply-prefix-fix-2.7.x.patch` — AWS control channel message prefix handling
 
             **Verification:** Binary contains `_REPLY` and `_FAILED` handling for AWS VPN server's 3-byte prefixed control messages.
           files: artifacts/*
