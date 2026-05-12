@@ -123,14 +123,19 @@ jobs:
         run: |
           BINARY=openvpn-source/src/openvpn/openvpn
           "$BINARY" --version 2>&1 | head -2
-          strings "$BINARY" | grep -q '_REPLY' || {
-            echo "::error::PUSH_REPLY prefix-fix not applied: '_REPLY' string not found in binary"
+          grep -c '_REPLY' openvpn-source/src/openvpn/forward.o > /dev/null 2>&1 || {
+            echo "::error::PUSH_REPLY prefix-fix not applied: '_REPLY' not found in forward.o"
             exit 1
           }
-          strings "$BINARY" | grep -q '_FAILED' || {
-            echo "::error::AUTH_FAILED prefix-fix not applied: '_FAILED' string not found in binary"
+          grep -c '_REPLY' openvpn-source/src/openvpn/push.o > /dev/null 2>&1 || {
+            echo "::error::PUSH_REPLY prefix-fix not applied: '_REPLY' not found in push.o"
             exit 1
           }
+          grep -c '_FAILED' openvpn-source/src/openvpn/forward.o > /dev/null 2>&1 || {
+            echo "::error::AUTH_FAILED prefix-fix not applied: '_FAILED' not found in forward.o"
+            exit 1
+          }
+          echo "Prefix-fix verified in compiled objects"
 
       - name: Package
         run: |
