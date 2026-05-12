@@ -30,17 +30,12 @@ jobs:
             exit 0
           fi
 
-          UPSTREAM=$(curl -sf https://api.github.com/repos/OpenVPN/openvpn/releases/latest | jq -r '.tag_name | ltrimstr("v")')
-          if [[ -z "$UPSTREAM" ]]; then
-            echo "should_build=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
           LAST_BUILT=$(cat LAST_BUILT_VERSION 2>/dev/null || echo "0")
-          echo "upstream=$UPSTREAM last_built=$LAST_BUILT"
+          PINNED=$(grep '^OPENVPN_VERSION' Makefile | cut -d= -f2 | tr -d ' ')
+          echo "pinned=$PINNED last_built=$LAST_BUILT"
 
-          if [[ "$UPSTREAM" != "$LAST_BUILT" ]]; then
-            echo "version=$UPSTREAM" >> "$GITHUB_OUTPUT"
+          if [[ "$PINNED" != "$LAST_BUILT" ]]; then
+            echo "version=$PINNED" >> "$GITHUB_OUTPUT"
             echo "should_build=true" >> "$GITHUB_OUTPUT"
           else
             echo "should_build=false" >> "$GITHUB_OUTPUT"
@@ -94,8 +89,11 @@ jobs:
       - name: Apply patches
         run: |
           cd openvpn-source
-          patch -p1 < "$GITHUB_WORKSPACE/0001-unprivileged.patch" || exit 1
-          patch -p1 < "$GITHUB_WORKSPACE/aws.patch" || exit 1
+          patch -p1 < "$GITHUB_WORKSPACE/0001-unprivileged.patch" || echo "::warning::Unprivileged patch failed (optional)"
+          patch -p1 < "$GITHUB_WORKSPACE/aws.patch" || {
+            echo "::error::aws.patch failed on OpenVPN ${{ steps.version.outputs.ver }} — buffer size + TLS encoding patches need rebase"
+            exit 1
+          }
           patch -p1 < "$GITHUB_WORKSPACE/${{ steps.version.outputs.prefix_patch }}" || {
             echo "::error::Prefix-fix patch failed on OpenVPN ${{ steps.version.outputs.ver }}"
             exit 1
@@ -210,6 +208,6 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `ACTION REQUIRED: Patch conflict on OpenVPN ${ver}`,
-              body: `The automated build failed for OpenVPN ${ver}. This likely means the \`push-reply-prefix-fix.patch\` or \`aws.patch\` does not apply cleanly.\n\n**Steps to fix:**\n1. Download OpenVPN ${ver} source\n2. Rebase the patches manually\n3. Push updated patches to master\n4. Re-run the workflow\n\n[Failed run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+              body: `The automated build failed for OpenVPN ${ver}. This likely means \`aws.patch\` or \`push-reply-prefix-fix.patch\` does not apply cleanly.\n\n**Steps to fix:**\n1. Download OpenVPN ${ver} source\n2. Rebase the patches manually\n3. Push updated patches to master\n4. Re-run the workflow\n\n[Failed run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
               labels: ['patch-conflict', 'automated']
             });
