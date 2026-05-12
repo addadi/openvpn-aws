@@ -103,10 +103,11 @@ jobs:
         run: |
           cd openvpn-source
           autoreconf -fvi
-          ./configure \
-            CC=${{ matrix.cc }} \
-            --prefix=/usr \
-            --disable-dependency-tracking
+          CONFIGURE_ARGS="--prefix=/usr --disable-dependency-tracking"
+          if [[ "${{ matrix.arch }}" == "aarch64" ]]; then
+            CONFIGURE_ARGS="$CONFIGURE_ARGS --host=aarch64-linux-gnu"
+          fi
+          ./configure CC=${{ matrix.cc }} $CONFIGURE_ARGS
           make -j$(nproc)
 
       - name: Verify binary
