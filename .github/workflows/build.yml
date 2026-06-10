@@ -61,7 +61,7 @@ jobs:
           echo "ver=$VER" >> "$GITHUB_OUTPUT"
           MAJOR=$(echo "$VER" | cut -d. -f1)
           MINOR=$(echo "$VER" | cut -d. -f2)
-          if [[ "$MAJOR" -ge 2 && "$MINOR" -ge 7 ]]; then
+          if (( MAJOR > 2 )) || (( MAJOR == 2 && MINOR >= 7 )); then
             echo "prefix_patch=patches/push-reply-prefix-fix-2.7.x.patch" >> "$GITHUB_OUTPUT"
             echo "aws_patch=aws-2.7.x.patch" >> "$GITHUB_OUTPUT"
             echo "unpriv_patch=0001-unprivileged-2.7.x.patch" >> "$GITHUB_OUTPUT"
