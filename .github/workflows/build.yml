@@ -82,10 +82,15 @@ jobs:
             sudo apt-get install -y gcc-aarch64-linux-gnu
           fi
 
-      - name: Download OpenVPN source
+      - name: Download and verify OpenVPN source
         run: |
           VER=${{ steps.version.outputs.ver }}
-          curl -L "https://github.com/OpenVPN/openvpn/archive/refs/tags/v${VER}.tar.gz" | tar xz
+          curl -fL -o "openvpn-${VER}.tar.gz" "https://github.com/OpenVPN/openvpn/archive/refs/tags/v${VER}.tar.gz"
+          if ! grep -E "^[0-9a-f]{64}  openvpn-${VER}.tar.gz$" upstream-sha256sums | sha256sum -c -; then
+            echo "::error::Upstream tarball checksum verification failed for openvpn-${VER}.tar.gz — add/verify its entry in upstream-sha256sums"
+            exit 1
+          fi
+          tar xzf "openvpn-${VER}.tar.gz"
           mv "openvpn-${VER}" openvpn-source
 
       - name: Apply patches

@@ -8,7 +8,10 @@ all: build
 
 fetch:
 	@echo "Fetching OpenVPN $(OPENVPN_VERSION) source..."
-	curl -L "https://github.com/OpenVPN/openvpn/archive/refs/tags/v$(OPENVPN_VERSION).tar.gz" | tar xz
+	curl -fL -o "openvpn-$(OPENVPN_VERSION).tar.gz" "https://github.com/OpenVPN/openvpn/archive/refs/tags/v$(OPENVPN_VERSION).tar.gz"
+	@echo "Verifying upstream tarball checksum..."
+	grep "  openvpn-$(OPENVPN_VERSION).tar.gz$$" upstream-sha256sums | sha256sum -c -
+	tar xzf "openvpn-$(OPENVPN_VERSION).tar.gz"
 	mv "openvpn-$(OPENVPN_VERSION)" $(SOURCE_DIR)
 
 patch: fetch
@@ -32,4 +35,4 @@ install: build
 	@echo "Installed to /usr/local/bin/openvpn-aws"
 
 clean:
-	rm -rf $(SOURCE_DIR) $(BINARY)
+	rm -rf $(SOURCE_DIR) $(BINARY) openvpn-*.tar.gz
