@@ -167,13 +167,27 @@ jobs:
         run: |
           echo "ver=${{ needs.check-upstream.outputs.version }}" >> "$GITHUB_OUTPUT"
 
+      - name: Guard against re-publishing an already-released version
+        id: guard
+        run: |
+          VER="${{ steps.version.outputs.ver }}"
+          LAST_BUILT=$(cat LAST_BUILT_VERSION 2>/dev/null || echo "")
+          if git ls-remote --exit-code --tags origin "refs/tags/v${VER}" > /dev/null && [[ "$VER" == "$LAST_BUILT" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Tag v${VER} already exists and matches LAST_BUILT_VERSION — skipping re-release"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Download all artifacts
+        if: steps.guard.outputs.skip != 'true'
         uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
       - name: Create release
+        if: steps.guard.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.ver }}
@@ -190,6 +204,7 @@ jobs:
           files: artifacts/*
 
       - name: Update LAST_BUILT_VERSION
+        if: steps.guard.outputs.skip != 'true'
         run: |
           echo "${{ steps.version.outputs.ver }}" > LAST_BUILT_VERSION
           git config user.name "github-actions[bot]"
