@@ -1,0 +1,19 @@
+Increase management interface command buffer from 1024 to 65536 bytes.
+
+AWS Client VPN SAML CRV1 authentication sends the SAML assertion (~12KB)
+as a management password command. The default 1024-byte command buffer
+truncates the command, causing "unknown command" errors.
+
+This patch is version-agnostic — the line `command_line_new(1024)` is
+unchanged in both OpenVPN 2.6.x and 2.7.x.
+
+diff --git a/src/openvpn/manage.c b/src/openvpn/manage.c
+--- a/src/openvpn/manage.c
++++ b/src/openvpn/manage.c
+@@ -2592,7 +2592,7 @@
+          * command output from/to the socket.
+          */
+-        man->connection.in = command_line_new(1024);
++        man->connection.in = command_line_new(65536);
+         man->connection.out = buffer_list_new();
+ 

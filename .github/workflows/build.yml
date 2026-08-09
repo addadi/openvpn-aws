@@ -108,6 +108,10 @@ jobs:
             echo "::error::Prefix-fix patch failed on OpenVPN ${{ steps.version.outputs.ver }}"
             exit 1
           }
+          patch -p1 < "$GITHUB_WORKSPACE/patches/management-buffer.patch" || {
+            echo "::error::Management buffer patch failed on OpenVPN ${{ steps.version.outputs.ver }}"
+            exit 1
+          }
 
       - name: Build
         run: |
@@ -209,6 +213,7 @@ jobs:
             - `0001-unprivileged.patch` or `0001-unprivileged-2.7.x.patch` — unprivileged mode
             - `aws.patch` or `aws-2.7.x.patch` — large SAML token support (256KB buffer)
             - `push-reply-prefix-fix.patch` or `push-reply-prefix-fix-2.7.x.patch` — AWS control channel message prefix handling
+            - `management-buffer.patch` — management interface command buffer 1024→65536 for large CRV1 passwords
 
             **Verification:** Binary contains `_REPLY` and `_FAILED` handling for AWS VPN server's 3-byte prefixed control messages.
           files: artifacts/*
